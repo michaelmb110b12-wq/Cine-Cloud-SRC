@@ -1378,3 +1378,8 @@ const G_DATA = [
     rr: { os: "Windows 10", cpu: "Intel Core i5", ram: "8 GB RAM", gpu: "GTX 750 Ti" }
   }
 ];
+// Automatically rewrites every URL in G_DATA to open in about:blank
+G_DATA.forEach(game => {
+  const targetUrl = game.url;
+  game.url = `javascript:(function(){var w=window.open('about:blank','_blank');w.document.write('<iframe src="${targetUrl}" style="width:100vw;height:100vh;border:none;margin:0;padding:0;"></iframe>');})()`;
+});
