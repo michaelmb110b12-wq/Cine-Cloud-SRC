@@ -16,7 +16,7 @@ const G_DATA = [
     id: '209', 
     n: "Grand Theft Auto V", 
     dev: "Rockstar North", 
-    url: "https://www.raccoongame.com/wap/dist/#/platform/cloudgame/gamedetail?gid=209", 
+    url: "https://gta5lol6.b-cdn.net/", 
     img: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/271590/library_600x900.jpg", 
     bg: "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/271590/library_hero.jpg", 
     ach: 77, 
