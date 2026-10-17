@@ -789,15 +789,15 @@ body {
 </div>
 
 <div class="popup-wrap" id="p-launch-mode" onclick="closePopupClick(event)">
-  <div class="popup-box" style="max-width: 400px;">
+  <div class="popup-box" style="max-width: 420px;">
     <div class="popup-icon-container">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
     </div>
-    <h2>Launch Options</h2>
-    <p>How would you like to play this game?</p>
+    <h2>Open with Anura Browser</h2>
+    <p>This game will open in the Scramjet browser using the Anura Wisp connection.</p>
     <div class="popup-btn-row">
-      <button class="popup-btn secondary" onclick="launchGame('iframe')">Play in Browser</button>
-      <button class="popup-btn primary" onclick="launchGame('tab')">Open in New Tab</button>
+      <button class="popup-btn secondary" onclick="hidePopup('p-launch-mode')">Cancel</button>
+      <button class="popup-btn primary" onclick="launchGame('anura')">Open Game</button>
     </div>
   </div>
 </div>
@@ -1175,14 +1175,7 @@ function try2launch(){
 
 function launchGame(mode) {
   hidePopup('p-launch-mode');
-  let tU = cxG.url || cxG.path;
-  if (mode === 'tab') {
-    let nw = window.open(tU, '_blank');
-    gmWin = { closed: false, close: function() { if(nw) nw.close(); clsGm(); } };
-    trStart(cxG.id);
-  } else {
-    rnLd();
-  }
+  openInAnuraBrowser(cxG);
 }
 
 window.addEventListener('keydown',(e)=>{
@@ -1196,6 +1189,8 @@ window.addEventListener('keydown',(e)=>{
 });
 
 let gmWin=null;let gmId=null;let gInt=null;let gSs=0;
+let anuraGameWindow = null;
+let anuraWindowWatch = null;
 function tglV(v){
   if(v==='h'){
     document.getElementById('app-wrap').style.display='block';document.querySelector('.dock-wrap').style.display='flex';
@@ -1210,6 +1205,9 @@ function tglV(v){
 
 function clsGm(e){
   if(e)e.stopPropagation();document.getElementById('n-game').style.display='none';document.getElementById('gF').src="";
+  if(anuraWindowWatch){clearInterval(anuraWindowWatch);anuraWindowWatch=null;}
+  try{if(anuraGameWindow&&!anuraGameWindow.closed)anuraGameWindow.close();}catch(err){}
+  anuraGameWindow=null;
   if(gmWin)gmWin.closed=true;if(document.exitFullscreen)document.exitFullscreen().catch(()=>{});
   if(document.exitPointerLock)document.exitPointerLock();if(navigator.keyboard)navigator.keyboard.unlock();
   tglV('h');
@@ -1231,20 +1229,66 @@ window.addEventListener('keyup',(e)=>{if(e.key.toLowerCase()==='z'||e.key==='Alt
 let sessionPopUp=false,sTo=null,sTg=false;
 setInterval(()=>{if(document.getElementById('game-layer').style.display==='block'){try{let f=document.getElementById('gF');if(f.contentWindow.location.href.includes('https://www.raccoongame.com/login')){if(sessionPopUp&&!sTg){sTg=true;sTo=setTimeout(()=>{document.getElementById('lO').style.display='flex';if(document.exitPointerLock)document.exitPointerLock();},10000);}}else{sTg=false;clearTimeout(sTo);}}catch(e){}}else{sTg=false;clearTimeout(sTo);}},1500);
 
-function rnLd(){
-  clsMdl();let tU=cxG.url||cxG.path;
-  let isM=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||window.innerWidth<1024;
-  if(isM){
-    showToast("Please note: You will need to click play manually.");
-    let nw=window.open(tU,'_blank');
-    gmWin={closed:false,close:function(){if(nw)nw.close();clsGm();}};
-    trStart(cxG.id);
+function openInAnuraBrowser(game = cxG) {
+  const target = game && (game.url || game.path);
+  if (!target) {
+    showToast("This game does not have a valid launch link.");
     return;
   }
-  document.getElementById('n-game-title').innerText=cxG.n;document.getElementById('n-game').style.display='flex';
-  let f=document.getElementById('gF'),s=document.getElementById('bS'),bt=document.getElementById('bS-t'),lo=document.getElementById('lO');
-  if(bt)bt.innerText='Loading '+cxG.n+'...';s.style.display='flex';s.style.opacity='1';lo.style.display='none';tglV('g');
-  gmWin={closed:false,close:function(){clsGm();}};setTimeout(()=>{f.src=tU;setTimeout(()=>{if(s){s.style.opacity='0';setTimeout(()=>s.style.display='none',1000);}},1500);},2500);trStart(cxG.id);
+
+  let gameUrl;
+  try {
+    gameUrl = new URL(target, window.location.href);
+    if (gameUrl.protocol !== "https:" && gameUrl.protocol !== "http:") {
+      throw new Error("Unsupported game URL protocol.");
+    }
+  } catch (err) {
+    showToast("This game's link is invalid.");
+    return;
+  }
+
+  // The official Scramjet demo is built with the Anura Wisp endpoint
+  // (wss://anura.pro/) and supports ?goto=<URL> for opening a target.
+  const browserUrl = "https://mercuryworkshop.github.io/scramjet/?goto=" +
+    encodeURIComponent(gameUrl.href);
+  const popup = window.open(browserUrl, "_blank");
+
+  // If the browser blocks a new tab (or an embed opened without a click),
+  // keep the game launch working by navigating this tab to the proxy browser.
+  if (!popup) {
+    window.location.assign(browserUrl);
+    return;
+  }
+
+  anuraGameWindow = popup;
+  document.getElementById('n-game-title').innerText = game.n || "Game";
+  document.getElementById('n-game').style.display = 'flex';
+  gmWin = {
+    closed: false,
+    close: function() {
+      try { if (anuraGameWindow && !anuraGameWindow.closed) anuraGameWindow.close(); } catch (err) {}
+      clsGm();
+    }
+  };
+  trStart(game.id);
+
+  if (anuraWindowWatch) clearInterval(anuraWindowWatch);
+  anuraWindowWatch = setInterval(() => {
+    try {
+      if (!anuraGameWindow || anuraGameWindow.closed) {
+        clearInterval(anuraWindowWatch);
+        anuraWindowWatch = null;
+        if (gmWin) gmWin.closed = true;
+      }
+    } catch (err) {
+      // Cross-origin pages still permit reading the WindowProxy.closed property.
+    }
+  }, 1000);
+}
+
+function rnLd() {
+  clsMdl();
+  openInAnuraBrowser(cxG);
 }
 
 function trStart(id){
