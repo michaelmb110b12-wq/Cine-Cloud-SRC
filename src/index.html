@@ -793,8 +793,8 @@ body {
     <div class="popup-icon-container">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
     </div>
-    <h2>Open with Anura Browser</h2>
-    <p>This game will open in the Scramjet browser using the Anura Wisp connection.</p>
+    <h2>Play in Anura Browser</h2>
+    <p>The game opens in Cine-Cloud's current game view using the Anura Wisp connection. It will not open another tab.</p>
     <div class="popup-btn-row">
       <button class="popup-btn secondary" onclick="hidePopup('p-launch-mode')">Cancel</button>
       <button class="popup-btn primary" onclick="launchGame('anura')">Open Game</button>
@@ -1189,8 +1189,6 @@ window.addEventListener('keydown',(e)=>{
 });
 
 let gmWin=null;let gmId=null;let gInt=null;let gSs=0;
-let anuraGameWindow = null;
-let anuraWindowWatch = null;
 function tglV(v){
   if(v==='h'){
     document.getElementById('app-wrap').style.display='block';document.querySelector('.dock-wrap').style.display='flex';
@@ -1205,9 +1203,6 @@ function tglV(v){
 
 function clsGm(e){
   if(e)e.stopPropagation();document.getElementById('n-game').style.display='none';document.getElementById('gF').src="";
-  if(anuraWindowWatch){clearInterval(anuraWindowWatch);anuraWindowWatch=null;}
-  try{if(anuraGameWindow&&!anuraGameWindow.closed)anuraGameWindow.close();}catch(err){}
-  anuraGameWindow=null;
   if(gmWin)gmWin.closed=true;if(document.exitFullscreen)document.exitFullscreen().catch(()=>{});
   if(document.exitPointerLock)document.exitPointerLock();if(navigator.keyboard)navigator.keyboard.unlock();
   tglV('h');
@@ -1247,43 +1242,46 @@ function openInAnuraBrowser(game = cxG) {
     return;
   }
 
-  // The official Scramjet demo is built with the Anura Wisp endpoint
-  // (wss://anura.pro/) and supports ?goto=<URL> for opening a target.
+  // The Scramjet demo is built to use the Anura Wisp endpoint (wss://anura.pro/).
+  // Load it inside Cine-Cloud's existing game frame so no new tab is opened.
   const browserUrl = "https://mercuryworkshop.github.io/scramjet/?goto=" +
     encodeURIComponent(gameUrl.href);
-  const popup = window.open(browserUrl, "_blank");
+  const frame = document.getElementById('gF');
+  const loading = document.getElementById('bS');
+  const loadingText = document.getElementById('bS-t');
+  const loginOverlay = document.getElementById('lO');
 
-  // If the browser blocks a new tab (or an embed opened without a click),
-  // keep the game launch working by navigating this tab to the proxy browser.
-  if (!popup) {
-    window.location.assign(browserUrl);
-    return;
-  }
-
-  anuraGameWindow = popup;
+  clsMdl();
   document.getElementById('n-game-title').innerText = game.n || "Game";
   document.getElementById('n-game').style.display = 'flex';
+
+  if (loadingText) loadingText.innerText = 'Opening ' + (game.n || 'game') + ' in Anura Browser...';
+  if (loading) {
+    loading.style.display = 'flex';
+    loading.style.opacity = '1';
+  }
+  if (loginOverlay) loginOverlay.style.display = 'none';
+
+  // Track this as the active embedded game view. clsGm() closes the frame.
   gmWin = {
     closed: false,
-    close: function() {
-      try { if (anuraGameWindow && !anuraGameWindow.closed) anuraGameWindow.close(); } catch (err) {}
-      clsGm();
-    }
+    close: function() { clsGm(); }
   };
+  tglV('g');
+  frame.src = browserUrl;
   trStart(game.id);
 
-  if (anuraWindowWatch) clearInterval(anuraWindowWatch);
-  anuraWindowWatch = setInterval(() => {
-    try {
-      if (!anuraGameWindow || anuraGameWindow.closed) {
-        clearInterval(anuraWindowWatch);
-        anuraWindowWatch = null;
-        if (gmWin) gmWin.closed = true;
-      }
-    } catch (err) {
-      // Cross-origin pages still permit reading the WindowProxy.closed property.
+  // Hide the loading card after the browser page has had time to render.
+  // The browser iframe remains visible if it takes longer to initialize.
+  setTimeout(() => {
+    if (!gmWin || gmWin.closed) return;
+    if (loading) {
+      loading.style.opacity = '0';
+      setTimeout(() => {
+        if (loading && gmWin && !gmWin.closed) loading.style.display = 'none';
+      }, 350);
     }
-  }, 1000);
+  }, 2200);
 }
 
 function rnLd() {
